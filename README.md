@@ -29,4 +29,3 @@ GUI ini dibuat dengan _App Designer style (uifigure)_ agar mudah digunakan oleh 
    ✅ **Reset** – Mengembalikan ke gambar asli  
    ✅ **Save As** – Menyimpan hasil ke berbagai format (.jpg, .png, .tif, .bmp)
 
----
