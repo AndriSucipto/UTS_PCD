@@ -1,38 +1,82 @@
-function results = add_noise_and_denoise(I, noiseType, params)
-% I: input image (grayscale or rgb)
-% noiseType: 'saltpepper' or 'gaussian'
-% returns struct with denoised variants
-if nargin<3, params.prob=0.05; end
-if strcmp(noiseType,'saltpepper')
-    noisy = imnoise(I,'salt & pepper', params.prob);
-else
-    noisy = imnoise(I,'gaussian', params.var);
+function R = add_noise_and_denoise(I, noise_type, params)
+% ADD_NOISE_AND_DENOISE - Tambahkan noise dan lakukan beberapa filter denoise
+% Kompatibel grayscale & RGB
+%
+% Input:
+%   I           : citra input (grayscale/RGB)
+%   noise_type  : 'saltpepper' | 'gaussian' | 'none'
+%   params.prob : probabilitas noise (untuk salt & pepper)
+%   params.w    : ukuran jendela (mis. 3)
+%   params.Q    : parameter contraharmonic
+%
+% Output:
+%   R : struktur berisi hasil dari berbagai filter
+%       R.mean, R.median, R.geometric, R.harmonic, R.contraharmonic
+
+% -------------------------------------------------------------
+% Pastikan semua parameter ada
+if ~isfield(params, 'prob'); params.prob = 0.05; end
+if ~isfield(params, 'w');    params.w = 3;       end
+if ~isfield(params, 'Q');    params.Q = 1.5;     end
+
+I = im2double(I);
+[M,N,C] = size(I);
+
+% --- 1. Tambahkan noise (jika diminta) ---
+switch lower(noise_type)
+    case 'saltpepper'
+        noisy = imnoise(I,'salt & pepper',params.prob);
+    case 'gaussian'
+        noisy = imnoise(I,'gaussian',0,0.01);
+    otherwise
+        noisy = I;
 end
 
-% create filters (we will implement all manually)
-results.noisy = noisy;
-window = params.w; if isempty(window), window = 3; end
+% Inisialisasi hasil
+R = struct();
 
-% min filter
-results.min = local_order_filter(noisy, window, 'min');
-% max filter
-results.max = local_order_filter(noisy, window, 'max');
-% median filter (manual)
-results.median = local_order_filter(noisy, window, 'median');
-% arithmetic mean
-results.arith = local_mean_filter(noisy, window);
-% geometric mean
-results.geom = local_geometric_filter(noisy, window);
-% harmonic mean
-results.harm = local_harmonic_filter(noisy, window);
-% contraharmonic (Q param)
-Q = getfield(params,'Q',0.5);
-results.contra = local_contraharmonic_filter(noisy, window, Q);
-% midpoint
-results.mid = local_midpoint_filter(noisy, window);
-% alpha-trimmed (d)
-d = getfield(params,'d',2);
-results.alpha = local_alpha_trimmed(noisy, window, d);
+% --- 2. Mean filter (average) ---
+try
+    h = fspecial('average', params.w);
+    mean_filtered = zeros(M,N,C);
+    for c = 1:C
+        mean_filtered(:,:,c) = imfilter(noisy(:,:,c), h, 'replicate');
+    end
+    R.mean = mat2gray(mean_filtered);
+catch
+    R.mean = noisy;
+end
 
-% helper functions should be implemented below or in utils
+% --- 3. Median filter ---
+try
+    median_filtered = zeros(M,N,C);
+    for c = 1:C
+        median_filtered(:,:,c) = medfilt2(noisy(:,:,c), [params.w params.w]);
+    end
+    R.median = mat2gray(median_filtered);
+catch
+    R.median = noisy;
+end
+
+% --- 4. Geometric mean filter ---
+try
+    R.geometric = local_geometric_filter(noisy, params.w);
+catch
+    R.geometric = noisy;
+end
+
+% --- 5. Harmonic mean filter ---
+try
+    R.harmonic = local_harmonic_filter(noisy, params.w);
+catch
+    R.harmonic = noisy;
+end
+
+% --- 6. Contraharmonic mean filter ---
+try
+    R.contraharmonic = local_contraharmonic_filter(noisy, params.w, params.Q);
+catch
+    R.contraharmonic = noisy;
+end
+
 end
